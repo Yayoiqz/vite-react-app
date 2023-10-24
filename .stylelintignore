@@ -1,0 +1,9 @@
+*.js
+*.ts
+*.tsx
+*.jpg
+*.png
+*.ttf
+*.svg
+node_modlue/**/*
+dist/**/*
