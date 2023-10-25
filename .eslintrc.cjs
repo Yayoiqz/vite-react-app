@@ -21,8 +21,8 @@ module.exports = {
       typescript: {},
       alias: {
         map: [['@', './src']],
-        extensions: ['.js', '.jsx', '.ts', '.tsx']
-      }
+        extensions: ['.js', '.jsx', '.ts', '.tsx', '.json']
+      },
     }
   },
   ignorePatterns: [
@@ -52,5 +52,13 @@ module.exports = {
     ],
     'react/react-in-jsx-scope': 'off',
     'no-console': 'off',
+    'import/extensions': [
+      'error',
+      'ignorePackages',
+      {
+        ts: 'never',
+        tsx: 'never'
+      }
+    ]
   },
 }
