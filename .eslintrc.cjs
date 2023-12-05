@@ -6,10 +6,13 @@ module.exports = {
   },
   extends: [
     'plugin:react/recommended',
+    'plugin:jsx-a11y/recommended',
     'airbnb',
+    'airbnb-typescript'
   ],
   parser: '@typescript-eslint/parser',
   parserOptions: {
+    project: ['./tsconfig.json', './tsconfig.node.json'],
     ecmaFeatures: {
       jsx: true,
     },
@@ -63,6 +66,7 @@ module.exports = {
         tsx: 'never'
       }
     ],
-    'no-param-reassign': ['error', { 'props': false }]
+    'no-param-reassign': ['error', { 'props': false }],
+    'jsx-a11y/media-has-caption': 'off',
   },
 }

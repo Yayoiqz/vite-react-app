@@ -18,6 +18,7 @@
     ]
   },
   "dependencies": {
+    "@loadable/component": "^5.15.3",
     "@reduxjs/toolkit": "^1.9.7",
     "axios": "^1.6.0",
     "lodash": "^4.17.21",
@@ -30,6 +31,7 @@
   "devDependencies": {
     "@commitlint/cli": "^18.2.0",
     "@commitlint/config-conventional": "^18.1.0",
+    "@types/loadable__component": "^5.13.7",
     "@types/node": "^20.8.7",
     "@types/react": "^18.2.15",
     "@types/react-dom": "^18.2.7",
@@ -54,7 +56,7 @@
     "scss": "^0.2.4",
     "stylelint": "^15.11.0",
     "stylelint-config-standard-scss": "^11.0.0",
-    "typescript": "^5.0.2",
+    "typescript": "^5.3.2",
     "vite": "^4.4.5"
   }
 }

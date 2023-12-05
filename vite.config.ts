@@ -11,11 +11,17 @@ export default defineConfig({
       '@': path.resolve(__dirname, 'src'), // 源文件根目录
     },
   },
+  server: {
+    host: '0.0.0.0',
+  },
   css: {
     preprocessorOptions: {
       scss: {
         additionalData: '@import "./src/assets/styles/variables.scss";',
       },
+    },
+    modules: {
+      localsConvention: 'camelCase',
     },
   },
 });
