@@ -1,5 +1,6 @@
 /* eslint-disable max-len */
-
+const MAX_SCALE = 3;
+const MIN_SCALE = 0.5;
 type Point = {
   x: number;
   y: number
@@ -39,21 +40,11 @@ class ScaleTranslateDom {
 
   isMoving = false; // 记录移动状态
 
-  // 双指缩放相关
+  pointerArr: any = [];
 
-  startPoint1:Point = { x: 0, y: 0 };
+  startPointArr: any = {};
 
-  startPoint2:Point = { x: 0, y: 0 };
-
-  lastPoint1:Point = { x: 0, y: 0 };
-
-  lastPoint2:Point = { x: 0, y: 0 };
-
-  diff = { x: 0, y: 0 }; // 相对于上一次pointermove移动差值
-
-  lastPointermove = { x: 0, y: 0 }; // 用于计算diff
-
-  lastCenter:Point = { x: 0, y: 0 };
+  endPointArr: any = {};
 
   initOffset: Point = { x: 0, y: 0 }; // 初始时视频偏移量
 
@@ -62,9 +53,8 @@ class ScaleTranslateDom {
   lastOffset: Point = { x: 0, y: 0 }; // 上一次的偏移量
 
   originHaveSet = false; // 是否已经重设origin
-  // end
 
-  longPressTimer: any = 0;
+  firstPointTime: any = 0;
 
   curScale = 1;
 
@@ -72,31 +62,13 @@ class ScaleTranslateDom {
 
   scaleOrigin = { x: 0, y: 0 };
 
-  lastScaleOrigin = { x: 0, y: 0 };
-
   constructor(dom: HTMLVideoElement) {
     this.dom = dom;
     this.initVideo();
-    // PC端监听mouse事件
-    // this.dom.addEventListener('mousedown', (e) => this.onPointerDown(e), true);
-    // this.dom.addEventListener('mousemove', (e) => this.onPointerMove(e), true);
-    // this.dom.addEventListener('mouseup', (e) => this.onPointerUp(e), true);
-    // this.dom.addEventListener('mouseleave', (e) => this.onPointerLeave(e), true);
-    // 移动端监听touch事件
-    this.dom.addEventListener('touchstart', (e) => this.onTouchStart(e));
-    this.dom.addEventListener('touchmove', (e) => this.onTouchMove(e));
-    this.dom.addEventListener('touchend', (e) => this.onTouchEnd(e));
-    // this.dom.addEventListener('touchcancel', (e) => this.onTouchCancel(e));
-  }
-
-  // 计算相对缩放前的偏移量，rect 为当前变换后元素的四周的位置
-  relativeCoordinate(x, y, rect) {
-    const cx = (x - rect.left) / this.curScale;
-    const cy = (y - rect.top) / this.curScale;
-    return {
-      x: cx,
-      y: cy,
-    };
+    this.dom.addEventListener('pointerdown', (e) => this.onPointerDown(e));
+    this.dom.addEventListener('pointermove', (e) => this.onPointerMove(e));
+    this.dom.addEventListener('pointerup', (e) => this.onPointerUp(e));
+    this.dom.addEventListener('pointerleave', (e) => this.onPointerLeave(e));
   }
 
   initVideo() {
@@ -109,6 +81,16 @@ class ScaleTranslateDom {
     this.initOffset = { x: m41, y: m42 };
     this.dom.style.transform = `translate(${this.initOffset.x}px, ${this.initOffset.y}px) scale(${this.curScale})`;
     return true;
+  }
+
+  // 计算相对缩放前的偏移量，rect 为当前变换后元素的四周的位置
+  relativeCoordinate(x, y, rect) {
+    const cx = (x - rect.left) / this.curScale;
+    const cy = (y - rect.top) / this.curScale;
+    return {
+      x: cx,
+      y: cy,
+    };
   }
 
   /**
@@ -125,42 +107,77 @@ class ScaleTranslateDom {
   }
 
   // PC端
-  onPointerDown(e: MouseEvent) {
-    this.longPressTimer = setTimeout(() => {
+  onPointerDown(e: PointerEvent) {
+    e.preventDefault();
+    requestAnimationFrame(() => {
+      this.pointerArr.push(e.pointerId);
+      // 移动端 - 单指触碰
+      if (this.pointerArr.length === 1) {
+        this.isMoving = true;
+        this.startPointArr[this.pointerArr[0]] = { x: e.clientX, y: e.clientY };
+        this.endPointArr[this.pointerArr[0]] = { x: e.clientX, y: e.clientY };
+        (this.dom as HTMLElement).style.transition = '';
+        this.firstPointTime = new Date().getTime();
+      } else if (this.pointerArr.length === 2) {
+        // 计算初始双指距离
+        this.isMoving = false;
+        this.startPointArr[this.pointerArr[1]] = { x: e.clientX, y: e.clientY };
+        this.endPointArr[this.pointerArr[1]] = { x: e.clientX, y: e.clientY };
+        this.originHaveSet = false;
+      }
+    });
+  }
+
+  onPointerMove(e: PointerEvent) {
+    e.preventDefault();
+    requestAnimationFrame(() => {
       if (!this.dom) {
         return;
       }
-      this.isMoving = true;
-      // PC端
-      this.startPoint1 = { x: e.clientX, y: e.clientY };
-      this.dom.style.transition = '';
-      clearTimeout(this.longPressTimer);
-      this.longPressTimer = null;
-    }, 300);
-  }
-
-  onPointerMove(e: MouseEvent) {
-    e.preventDefault();
-    requestAnimationFrame(() => {
-      if (!this.dom || !this.isMoving) {
-        return;
+      if (this.pointerArr.length === 1) {
+        this.endPointArr[e.pointerId] = { x: e.clientX, y: e.clientY };
+        const dis = getDistance(this.startPointArr[e.pointerId], this.endPointArr[e.pointerId]);
+        if (!this.isMoving) {
+          return;
+        }
+        if (new Date().getTime() - this.firstPointTime <= 200 && dis > 1) {
+          this.isMoving = false;
+          return;
+        }
+        const diff = getDiff(this.startPointArr[e.pointerId], this.endPointArr[e.pointerId]);
+        this.offset.x = this.lastOffset.x + diff.x;
+        this.offset.y = this.lastOffset.y + diff.y;
+        const final = { x: this.offset.x + this.initOffset.x, y: this.offset.y + this.initOffset.y };
+        this.dom.style.transform = `translate(${final.x}px, ${final.y}px) scale(${this.curScale})`;
+      } else if (this.pointerArr.length === 2) {
+        const [pointId1, pointId2] = this.pointerArr;
+        this.endPointArr[e.pointerId] = { x: e.clientX, y: e.clientY };
+        const ratio = getDistance(this.endPointArr[pointId1], this.endPointArr[pointId2]) / getDistance(this.startPointArr[pointId1], this.startPointArr[pointId2]);
+        // 限制缩放比例范围
+        this.curScale = this.lastScale * ratio;
+        if (this.lastScale * ratio >= MAX_SCALE) {
+          this.curScale = MAX_SCALE;
+        } else if (this.lastScale * ratio <= MIN_SCALE) {
+          this.curScale = MIN_SCALE;
+        }
+        // 计算当前双指中心点坐标
+        if (!this.originHaveSet) {
+          this.originHaveSet = true;
+          const center = getCenter(this.endPointArr[pointId1], this.endPointArr[pointId2]);
+          const origin = this.relativeCoordinate(center.x, center.y, this.dom.getBoundingClientRect());
+          this.offset.x = (this.curScale - 1) * (origin.x - this.scaleOrigin.x) + this.offset.x;
+          this.offset.y = (this.curScale - 1) * (origin.y - this.scaleOrigin.y) + this.offset.y;
+          this.dom.style.transformOrigin = `${origin.x}px ${origin.y}px`;
+          this.scaleOrigin = origin;
+        }
+        const final = { x: this.offset.x + this.initOffset.x, y: this.offset.y + this.initOffset.y };
+        this.dom.style.transform = `translate(${final.x}px, ${final.y}px) scale(${this.curScale})`;
       }
-      this.lastPoint1 = { x: e.clientX, y: e.clientY };
-      const diff = getDiff(this.startPoint1, this.lastPoint1);
-      this.offset.x = this.lastOffset.x + diff.x;
-      this.offset.y = this.lastOffset.y + diff.y;
-      const final = { x: this.offset.x + this.initOffset.x, y: this.offset.y + this.initOffset.y };
-      this.dom.style.transform = `translate(${final.x}px, ${final.y}px) scale(${this.curScale})`;
     });
   }
 
   handleLeaveNew = () => {
     if (!this.dom) {
-      return;
-    }
-    if (this.longPressTimer) {
-      clearTimeout(this.longPressTimer);
-      this.longPressTimer = null;
       return;
     }
     this.isMoving = false;
@@ -246,109 +263,28 @@ class ScaleTranslateDom {
     this.dom.style.transition = 'transform 0.4s';
   };
 
-  onPointerLeave(e: MouseEvent) {
+  onPointerUp(e: PointerEvent) {
     requestAnimationFrame(() => {
       e.preventDefault();
+      this.lastScale = this.curScale;
+      this.pointerArr = [];
+      this.startPointArr = {};
+      this.endPointArr = {};
       this.handleLeaveNew();
     });
   }
 
-  onPointerUp(e: MouseEvent) {
+  onPointerLeave(e: PointerEvent) {
+    if (e.pointerType !== 'mouse') {
+      return;
+    }
     requestAnimationFrame(() => {
       e.preventDefault();
+      this.lastScale = this.curScale;
+      this.pointerArr = [];
+      this.startPointArr = {};
+      this.endPointArr = {};
       this.handleLeaveNew();
-    });
-  }
-
-  // 移动端事件监听
-  onTouchStart(e: TouchEvent) {
-    requestAnimationFrame(() => {
-      const { touches } = e;
-      // 移动端 - 单指触碰
-      if (touches && touches.length === 1) {
-        this.longPressTimer = setTimeout(() => {
-          this.isMoving = true;
-          this.startPoint1 = { x: touches[0].pageX, y: touches[0].pageY };
-          (this.dom as HTMLElement).style.transition = '';
-        }, 300);
-      } else if (touches && touches.length === 2) {
-        // 计算初始双指距离
-        this.startPoint1 = { x: touches[0].clientX, y: touches[0].clientY };
-        this.startPoint2 = { x: touches[1].clientX, y: touches[1].clientY };
-        this.originHaveSet = false;
-        this.isMoving = false;
-      }
-    });
-  }
-
-  onTouchMove(e: TouchEvent) {
-    e.preventDefault();
-    requestAnimationFrame(() => {
-      if (!this.dom) {
-        return;
-      }
-      const { touches } = e;
-      if (touches && touches.length === 1) {
-        // 移动端 - 单指拖拽
-        // 满足条件：正在移动中并且timer为null并且初始点长按
-        if (this.longPressTimer) {
-          clearTimeout(this.longPressTimer);
-          this.longPressTimer = null;
-          return;
-        }
-        if (!this.isMoving) {
-          return;
-        }
-        this.lastPoint1 = { x: touches[0].pageX, y: touches[0].pageY };
-        const diff = getDiff(this.startPoint1, this.lastPoint1);
-        this.offset.x = this.lastOffset.x + diff.x;
-        this.offset.y = this.lastOffset.y + diff.y;
-        const final = { x: this.offset.x + this.initOffset.x, y: this.offset.y + this.initOffset.y };
-        this.dom.style.transform = `translate(${final.x}px, ${final.y}px) scale(${this.curScale})`;
-      } else if (touches && touches.length === 2) {
-        // 移动端 - 双指缩放
-        const current1 = { x: touches[0].clientX, y: touches[0].clientY };
-        const current2 = { x: touches[1].clientX, y: touches[1].clientY };
-        const ratio = getDistance(current1, current2) / getDistance(this.startPoint1, this.startPoint2);
-        // 根据缩放比例
-        this.curScale = this.lastScale * ratio;
-        // 计算当前双指中心点坐标
-        if (!this.originHaveSet) {
-          this.originHaveSet = true;
-          const center = getCenter(current1, current2);
-          const origin = this.relativeCoordinate(center.x, center.y, this.dom.getBoundingClientRect());
-          this.offset.x = (this.curScale - 1) * (origin.x - this.scaleOrigin.x) + this.offset.x;
-          this.offset.y = (this.curScale - 1) * (origin.y - this.scaleOrigin.y) + this.offset.y;
-          this.dom.style.transformOrigin = `${origin.x}px ${origin.y}px`;
-          this.scaleOrigin = origin;
-        }
-        const final = { x: this.offset.x + this.initOffset.x, y: this.offset.y + this.initOffset.y };
-        this.dom.style.transform = `translate(${final.x}px, ${final.y}px) scale(${this.curScale})`;
-      }
-    });
-  }
-
-  onTouchEnd(e: TouchEvent) {
-    e.preventDefault();
-    requestAnimationFrame(() => {
-      // 双指缩放后重置数据
-      if (this.longPressTimer) {
-        clearTimeout(this.longPressTimer);
-        this.longPressTimer = null;
-      }
-      if (e.touches.length !== 1) {
-        this.lastScale = this.curScale;
-      }
-      this.handleLeaveNew();
-    });
-  }
-
-  onTouchCancel(e: TouchEvent) {
-    requestAnimationFrame(() => {
-      console.log('cancel');
-      if (e.touches.length !== 1) {
-        this.lastScale = this.curScale;
-      }
     });
   }
 
@@ -361,11 +297,10 @@ class ScaleTranslateDom {
     this.lastScale = 1;
     this.offset = { x: 0, y: 0 };
     this.lastOffset = { x: 0, y: 0 };
-    this.startPoint1 = { x: 0, y: 0 };
-    this.startPoint2 = { x: 0, y: 0 };
-    this.lastPoint1 = { x: 0, y: 0 };
-    this.lastPoint2 = { x: 0, y: 0 };
     this.scaleOrigin = { x: 0, y: 0 };
+    this.pointerArr = [];
+    this.startPointArr = {};
+    this.endPointArr = {};
     this.isMoving = false;
     this.dom.style.transform = `translate(${this.initOffset.x}px, ${this.initOffset.y}px) scale(${this.curScale})`;
     this.dom.style.transformOrigin = `${-this.initOffset.x}px ${-this.initOffset.y}px`;
