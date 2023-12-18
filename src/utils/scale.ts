@@ -65,10 +65,14 @@ class ScaleTranslateDom {
   constructor(dom: HTMLVideoElement) {
     this.dom = dom;
     this.initVideo();
-    this.dom.addEventListener('pointerdown', (e) => this.onPointerDown(e));
-    this.dom.addEventListener('pointermove', (e) => this.onPointerMove(e));
-    this.dom.addEventListener('pointerup', (e) => this.onPointerUp(e));
-    this.dom.addEventListener('pointerleave', (e) => this.onPointerLeave(e));
+    dom.addEventListener('pointerdown', (e) => this.onPointerDown(e));
+    dom.addEventListener('pointermove', (e) => this.onPointerMove(e));
+    dom.addEventListener('pointerup', (e) => this.onPointerUp(e));
+    dom.addEventListener('pointerleave', (e) => this.onPointerLeave(e));
+
+    // this.dom.addEventListener('click', (e) => {
+    //   console.log(123123, 'click');
+    // });
   }
 
   initVideo() {
@@ -264,27 +268,39 @@ class ScaleTranslateDom {
   };
 
   onPointerUp(e: PointerEvent) {
+    e.preventDefault();
     requestAnimationFrame(() => {
-      e.preventDefault();
+      if (this.isMoving) {
+        e.stopPropagation();
+      }
       this.lastScale = this.curScale;
+      if (this.pointerArr.length) {
+        // 双指时只执行一次边界判断
+        this.handleLeaveNew();
+      }
       this.pointerArr = [];
       this.startPointArr = {};
       this.endPointArr = {};
-      this.handleLeaveNew();
     });
   }
 
   onPointerLeave(e: PointerEvent) {
+    e.preventDefault();
     if (e.pointerType !== 'mouse') {
       return;
     }
     requestAnimationFrame(() => {
-      e.preventDefault();
+      if (this.isMoving) {
+        e.stopPropagation();
+      }
       this.lastScale = this.curScale;
+      if (this.pointerArr.length) {
+        // 双指时只执行一次边界判断
+        this.handleLeaveNew();
+      }
       this.pointerArr = [];
       this.startPointArr = {};
       this.endPointArr = {};
-      this.handleLeaveNew();
     });
   }
 
