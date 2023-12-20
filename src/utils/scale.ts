@@ -65,14 +65,31 @@ class ScaleTranslateDom {
   constructor(dom: HTMLVideoElement) {
     this.dom = dom;
     this.initVideo();
+    this.initParentDom();
     dom.addEventListener('pointerdown', (e) => this.onPointerDown(e));
     dom.addEventListener('pointermove', (e) => this.onPointerMove(e));
     dom.addEventListener('pointerup', (e) => this.onPointerUp(e));
     dom.addEventListener('pointerleave', (e) => this.onPointerLeave(e));
+    dom.addEventListener('click', () => {
+      console.log('first click');
+    });
+    window.addEventListener('resize', () => {
+      this.onResize();
+    });
+  }
 
-    // this.dom.addEventListener('click', (e) => {
-    //   console.log(123123, 'click');
-    // });
+  initParentDom() {
+    const parent = this.dom?.parentNode;
+    const newParent = document.createElement('div');
+    newParent?.appendChild(this.dom!);
+    newParent.style.width = '100%';
+    newParent.style.height = '100%';
+    parent?.appendChild(newParent);
+    newParent.addEventListener('click', (e) => {
+      if (this.isMoving) {
+        e.stopPropagation();
+      }
+    }, true);
   }
 
   initVideo() {
@@ -105,7 +122,13 @@ class ScaleTranslateDom {
     if (!this.dom) {
       return;
     }
-    this.curScale = scaleRatio;
+    if (scaleRatio > MAX_SCALE) {
+      this.curScale = MAX_SCALE;
+    } else if (scaleRatio < MIN_SCALE) {
+      this.curScale = MIN_SCALE;
+    } else {
+      this.curScale = scaleRatio;
+    }
     const final = { x: this.initOffset.x + this.offset.x, y: this.initOffset.y + this.offset.y };
     this.dom.style.transform = `translate(${final.x}px, ${final.y}px) scale(${this.curScale})`;
   }
@@ -117,14 +140,12 @@ class ScaleTranslateDom {
       this.pointerArr.push(e.pointerId);
       // 移动端 - 单指触碰
       if (this.pointerArr.length === 1) {
-        this.isMoving = true;
         this.startPointArr[this.pointerArr[0]] = { x: e.clientX, y: e.clientY };
         this.endPointArr[this.pointerArr[0]] = { x: e.clientX, y: e.clientY };
         (this.dom as HTMLElement).style.transition = '';
         this.firstPointTime = new Date().getTime();
       } else if (this.pointerArr.length === 2) {
         // 计算初始双指距离
-        this.isMoving = false;
         this.startPointArr[this.pointerArr[1]] = { x: e.clientX, y: e.clientY };
         this.endPointArr[this.pointerArr[1]] = { x: e.clientX, y: e.clientY };
         this.originHaveSet = false;
@@ -141,13 +162,11 @@ class ScaleTranslateDom {
       if (this.pointerArr.length === 1) {
         this.endPointArr[e.pointerId] = { x: e.clientX, y: e.clientY };
         const dis = getDistance(this.startPointArr[e.pointerId], this.endPointArr[e.pointerId]);
-        if (!this.isMoving) {
-          return;
-        }
         if (new Date().getTime() - this.firstPointTime <= 200 && dis > 1) {
           this.isMoving = false;
           return;
         }
+        this.isMoving = true;
         const diff = getDiff(this.startPointArr[e.pointerId], this.endPointArr[e.pointerId]);
         this.offset.x = this.lastOffset.x + diff.x;
         this.offset.y = this.lastOffset.y + diff.y;
@@ -318,8 +337,14 @@ class ScaleTranslateDom {
     this.startPointArr = {};
     this.endPointArr = {};
     this.isMoving = false;
-    this.dom.style.transform = `translate(${this.initOffset.x}px, ${this.initOffset.y}px) scale(${this.curScale})`;
+    this.initOffset.x = -window.innerWidth / 2;
+    this.initOffset.y = -window.innerHeight / 2;
+    this.dom.style.transform = `translate(-50%, -50%) scale(${this.curScale})`;
     this.dom.style.transformOrigin = `${-this.initOffset.x}px ${-this.initOffset.y}px`;
+  }
+
+  onResize() {
+    this.reset();
   }
 }
 
