@@ -24,4 +24,13 @@ export default defineConfig({
       localsConvention: 'camelCase',
     },
   },
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'react-vendor': ['react', 'react-dom'],
+        },
+      },
+    },
+  },
 });
